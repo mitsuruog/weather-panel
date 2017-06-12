@@ -1,24 +1,56 @@
 (ns weather-panel.core
     (:require-macros [cljs.core.async.macros :refer [go]])
-    (:require [reagent.core :as reagent :refer [atom]]
+    (:require [reagent.core :as reagent]
               [cljs-http.client :as http]
               [cljs.core.async :refer [<!]]))
 
 ;; -------------------------
 ;; Global stete
-(defonce app-state (atom {:count 0}))
+(defonce app-state (reagent/atom {
+    :count 0
+    :weather {}
+  }))
 
 
 ;; -------------------------
 ;; Functions
-(defn fetchWeatherData []
-  (js/console.log "Hello"))
+(defn fetchWeatherData [position]
+  (js/console.log "fetchWeatherData" position)
+  (go (let [response (<! (http/get "http://api.openweathermap.org/data/2.5/weather"
+    {:with-credentials? false
+     :query-params {
+          "APPID" "3a5d16a9915a78f288b845232e1911b4"
+          "lat" position.coords.latitude
+          "lon" position.coords.longitude
+          "units" "metric"
+          "lang" "ja"
+        }}))]
+    (prn (:status response))
+    (prn (map :login (:body response)))
+    (swap! app-state assoc :weather (:body response)))))
 
-;; https://query.yahooapis.com/v1/public/yql?q=
-;; select * from weather.forecast where woeid in (select woeid from geo.places(1) where text="tokyo")
-;; https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22tokyo%22)&format=json&diagnostics=true&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys&callback=
-;; select * from weather.forecast where woeid in (SELECT woeid FROM geo.placefinder WHERE text="35,135" and gflags="R")
 
+(defn fetchWeeklyForecast [position]
+  (js/console.log "fetchWeeklyForecast" position)
+  (go (let [response (<! (http/get "http://api.openweathermap.org/data/2.5/forecast/daily"
+    {:with-credentials? false
+      :query-params {
+           "APPID" "3a5d16a9915a78f288b845232e1911b4"
+           "lat" position.coords.latitude
+           "lon" position.coords.longitude
+           "cnt" 5
+           "units" "metric"
+           "lang" "ja"
+         }}))]
+     (prn (:status response))
+     (prn (map :login (:body response))))))
+
+
+(defn getGeoCoordinats []
+  (js/console.log "getGeoCoordinats")
+  (js/navigator.geolocation.getCurrentPosition (fn [position]
+    (fetchWeatherData position)
+    (fetchWeeklyForecast position))))
 
 ;; -------------------------
 ;; Stateless Components
@@ -56,21 +88,24 @@
 ;; App
 
 (defn app []
-  [:div.weather
-    [today]
-    [day]
-    ; (for [day [1,2,3,4,5]]
-    ;   ^{:key day} [day])
-    [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
-    [:div (:count @app-state)]
-  ])
+  (reagent/create-class {
+    :component-will-mount (fn [] (getGeoCoordinats))
+    :reagent-render (fn []
+      [:div.weather
+        [today]
+        [day]
+        ; (for [day [1,2,3,4,5]]
+        ;   ^{:key day} [day])
+        [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
+        [:div (:weather @app-state)]
+      ])
+    }))
 
 ;; -------------------------
 ;; Initialize app
 
 (defn mount-root []
-  (reagent/render [app] (.getElementById js/document "app"))
-  (fetchWeatherData))
+  (reagent/render [app] (.getElementById js/document "app")))
 
 (defn init! []
   (mount-root))
