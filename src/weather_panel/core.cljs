@@ -5,7 +5,7 @@
               [cljs.core.async :refer [<!]]))
 
 ;; -------------------------
-;; Global stete
+;; Global state
 (defonce app-state (reagent/atom {
     :count 0
     :weather {}
@@ -26,8 +26,7 @@
           "lang" "ja"
         }}))]
     (prn (:status response))
-    (prn (map :login (:body response)))
-    (swap! app-state assoc :weather (:body response)))))
+    (prn "Weather is " (:body response)))))
 
 
 (defn fetchWeeklyForecast [position]
@@ -43,7 +42,7 @@
            "lang" "ja"
          }}))]
      (prn (:status response))
-     (prn (map :login (:body response))))))
+     (prn "Weekly forecast is " (:body response)))))
 
 
 (defn getGeoCoordinats []
@@ -97,9 +96,23 @@
         ; (for [day [1,2,3,4,5]]
         ;   ^{:key day} [day])
         [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
-        [:div (:weather @app-state)]
+        [:div (:count @app-state)]
       ])
     }))
+
+; (defn some-fn []
+;   (let [weather (getGeoCoordinats)]
+;     (fn []
+;       [weather-panel (:weather @app-state)])))
+;
+; (defn new-app []
+;   (let [_ (getGeoCoordinats)]
+;     (fn []
+;       [:div.weather
+;         [today]
+;         [day]
+;         [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
+;         [:div (:count @app-state)]])))
 
 ;; -------------------------
 ;; Initialize app
