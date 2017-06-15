@@ -55,26 +55,26 @@
 
 (defn temperature [max min]
   [:div.temperature
-   [:span (js/Math.round max)]
+   [:span (str (js/Math.round max) "°")]
    [:span " / "]
-   [:span (js/Math.round min)]])
+   [:span (str (js/Math.round min) "°")]])
 
 (defn day [forecast]
   (let [temp (:temp forecast)
         weather (first (:weather forecast))]
     [:div.day
+     [:div "6/1"]
      [:div.day-of-the-week (getDay (* 1000 (:dt forecast)))]
      [:div.weather-icon
       [weatherIcon (:id weather)]]
-     [temperature (:max temp) (:min temp)]
-     [:div.rainy-percent "15"]]))
+     [temperature (:max temp) (:min temp)]]))
 
 (defn week []
   (let [weeklyForecast (:weeklyForecast @app-state)
         list (:list weeklyForecast)]
     [:div.week
      (for [forecast list]
-       ^{:key forecast} (day forecast))]))
+       (day forecast))]))
 
 (defn today []
   (let [currentWeather (:currentWeather @app-state)
@@ -84,10 +84,10 @@
      [:div.weather-icon
       [weatherIcon (:id weather)]]
      [:div.weather-detail
-      [:div.current-temperature (js/Math.round (:temp main))]
+      [:div "6/4"]
+      [:div.current-temperature (str (js/Math.round (:temp main)) "°")]
       [:div.name (:description weather)]
-      [temperature (:temp_max main) (:temp_min main)]
-      [:div:rainy-percent "0"]]]))
+      [temperature (:temp_max main) (:temp_min main)]]]))
 
 (defn app []
   (let [_ (getGeoCoordinats)]
