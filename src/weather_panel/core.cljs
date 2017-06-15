@@ -1,118 +1,100 @@
 (ns weather-panel.core
-    (:require-macros [cljs.core.async.macros :refer [go]])
-    (:require [reagent.core :as reagent]
-              [cljs-http.client :as http]
-              [cljs.core.async :refer [<!]]))
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [reagent.core :as reagent]
+            [cljs-http.client :as http]
+            [cljs.core.async :refer [<!]]))
 
 ;; -------------------------
 ;; Global state
-(defonce app-state (reagent/atom {
-    :count 0
-    :weather {}
-  }))
-
+(defonce app-state (reagent/atom {:currentWeather {}
+                                  :weeklyForecast {}}))
 
 ;; -------------------------
 ;; Functions
 (defn fetchWeatherData [position]
   (js/console.log "fetchWeatherData" position)
   (go (let [response (<! (http/get "http://api.openweathermap.org/data/2.5/weather"
-    {:with-credentials? false
-     :query-params {
-          "APPID" "3a5d16a9915a78f288b845232e1911b4"
-          "lat" position.coords.latitude
-          "lon" position.coords.longitude
-          "units" "metric"
-          "lang" "ja"
-        }}))]
-    (prn (:status response))
-    (prn "Weather is " (:body response)))))
-
+                                   {:with-credentials? false
+                                    :query-params {"APPID" "3a5d16a9915a78f288b845232e1911b4"
+                                                   "lat" position.coords.latitude
+                                                   "lon" position.coords.longitude
+                                                   "units" "metric"
+                                                   "lang" "ja"}}))]
+        (swap! app-state assoc :currentWeather (:body response))
+        (prn "Current weather is " (:currentWeather @app-state)))))
 
 (defn fetchWeeklyForecast [position]
   (js/console.log "fetchWeeklyForecast" position)
   (go (let [response (<! (http/get "http://api.openweathermap.org/data/2.5/forecast/daily"
-    {:with-credentials? false
-      :query-params {
-           "APPID" "3a5d16a9915a78f288b845232e1911b4"
-           "lat" position.coords.latitude
-           "lon" position.coords.longitude
-           "cnt" 5
-           "units" "metric"
-           "lang" "ja"
-         }}))]
-     (prn (:status response))
-     (prn "Weekly forecast is " (:body response)))))
-
+                                   {:with-credentials? false
+                                    :query-params {"APPID" "3a5d16a9915a78f288b845232e1911b4"
+                                                   "lat" position.coords.latitude
+                                                   "lon" position.coords.longitude
+                                                   "cnt" 5
+                                                   "units" "metric"
+                                                   "lang" "ja"}}))]
+        (swap! app-state assoc :weeklyForecast (:body response))
+        (prn "Weekly forecast is " (:weeklyForecast @app-state)))))
 
 (defn getGeoCoordinats []
   (js/console.log "getGeoCoordinats")
   (js/navigator.geolocation.getCurrentPosition (fn [position]
-    (fetchWeatherData position)
-    (fetchWeeklyForecast position))))
+                                                 (prn "Position is " position)
+                                                 (fetchWeatherData position)
+                                                 (fetchWeeklyForecast position))))
+
+(defn getDay [timestamp]
+  (let [days ["SUN","MON","TUE","WED","THU","FRI","SAT"]]
+    (days (.getDay (js/Date. timestamp)))))
 
 ;; -------------------------
 ;; Stateless Components
 
-(defn temperature []
+(defn weatherIcon [id]
+  [:i.wi {:class (str "wi-owm-" id)}])
+
+(defn temperature [max min]
   [:div.temperature
-    [:span "25"]
-    [:span "15"]
-  ])
+   [:span (js/Math.round max)]
+   [:span " / "]
+   [:span (js/Math.round min)]])
 
-(defn day []
-  [:div.day
-    [:div.day-of-the-week "SUN"]
-    [:div.weather-icon
-      [:i.wi.wi-day-sunny]
-    ]
-    [temperature]
-    [:div.rainy-percent "15"]
-  ])
+(defn day [forecast]
+  (let [temp (:temp forecast)
+        weather (first (:weather forecast))]
+    [:div.day
+     [:div.day-of-the-week (getDay (* 1000 (:dt forecast)))]
+     [:div.weather-icon
+      [weatherIcon (:id weather)]]
+     [temperature (:max temp) (:min temp)]
+     [:div.rainy-percent "15"]]))
 
-(defn today[]
-  [:div.today
-    [:div.weather-icon
-      [:i.wi.wi-day-sunny]
-    ]
-    [:div.weather-detail
-      [:div.current-temperature "20"]
-      [:div.name "sunny"]
-      [temperature]
-      [:div:rainy-percent "0"]
-    ]
-  ])
+(defn week []
+  (let [weeklyForecast (:weeklyForecast @app-state)
+        list (:list weeklyForecast)]
+    [:div.week
+     (for [forecast list]
+       ^{:key forecast} (day forecast))]))
 
-;; -------------------------
-;; App
+(defn today []
+  (let [currentWeather (:currentWeather @app-state)
+        main (:main currentWeather)
+        weather (first (:weather currentWeather))]
+    [:div.today
+     [:div.weather-icon
+      [weatherIcon (:id weather)]]
+     [:div.weather-detail
+      [:div.current-temperature (js/Math.round (:temp main))]
+      [:div.name (:description weather)]
+      [temperature (:temp_max main) (:temp_min main)]
+      [:div:rainy-percent "0"]]]))
 
 (defn app []
-  (reagent/create-class {
-    :component-will-mount (fn [] (getGeoCoordinats))
-    :reagent-render (fn []
+  (let [_ (getGeoCoordinats)]
+    (fn []
       [:div.weather
-        [today]
-        [day]
-        ; (for [day [1,2,3,4,5]]
-        ;   ^{:key day} [day])
-        [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
-        [:div (:count @app-state)]
-      ])
-    }))
-
-; (defn some-fn []
-;   (let [weather (getGeoCoordinats)]
-;     (fn []
-;       [weather-panel (:weather @app-state)])))
-;
-; (defn new-app []
-;   (let [_ (getGeoCoordinats)]
-;     (fn []
-;       [:div.weather
-;         [today]
-;         [day]
-;         [:button {:on-click #(swap! app-state assoc :count (.getTime (js/Date.)))} "click"]
-;         [:div (:count @app-state)]])))
+       [today]
+       [week]])))
 
 ;; -------------------------
 ;; Initialize app
